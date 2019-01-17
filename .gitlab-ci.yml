@@ -1,0 +1,35 @@
+variables:
+  GIT_SSL_NO_VERIFY: "1"
+ 
+stages:
+  - build
+  - deploy
+build:
+  stage: build
+  image: jojomi/hugo
+  script:
+  - hugo version
+  - git submodule update --init --recursive
+  - hugo -d public
+  artifacts:
+    paths:
+    - public
+  only:
+  - master
+deploy:
+  stage: deploy
+  image: alpine:latest
+  tags:
+  - private
+  before_script:
+    - apk update && apk add openssh-client bash rsync
+  script:
+  - eval $(ssh-agent -s)
+  - bash -c 'ssh-add <(echo "${SSH_PRIVATE_KEY}")'
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - echo "${SSH_HOST_KEY}" > ~/.ssh/known_hosts
+  - chmod 644 ~/.ssh/known_hosts
+  - rsync -hrvz --delete --exclude=_ -e 'ssh -p 22' public/ "${SSH_USER_HOST_LOCATION}" 
+  only:
+  - master
